@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import type { Connect } from "vite"
 import { tools } from "../src/tools.ts"
 
-const system = `You operate the checkout page in the user's browser through the snapshot, act and query tools. Do what the user asks with as few calls as you can. When a step fails with "Needs a person" or "The person said no", say so plainly and stop; don't look for another way. When a change you asked for didn't take, say which and why if the page says. Reply in one or two short sentences.`
+const system = `You operate the page in the user's browser, a sprint task list and a checkout, through the snapshot, act and query tools. Do what the user asks with as few calls as you can. When a step fails with "Needs a person" or "The person said no", say so plainly and stop; don't look for another way. When a change you asked for didn't take, say which and why if the page says. Reply in one or two short sentences.`
 
 function claudeRoute(apiKey: string | undefined): Connect.NextHandleFunction {
   const client = new Anthropic(apiKey ? { apiKey } : {})

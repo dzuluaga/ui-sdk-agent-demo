@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { Chat } from "./chat"
 import { Checkout } from "./checkout"
 import "./styles.css"
+import { Tasks } from "./tasks"
 
 function askThePerson(text: string, signal: AbortSignal) {
   const bar = document.getElementById("approval")!
@@ -26,8 +27,9 @@ const agent = createAgent({
 
 createRoot(document.getElementById("root")!).render(
   <>
-    <Checkout />
+    <Tasks />
     <Chat agent={agent} />
+    <Checkout />
   </>
 )
 
