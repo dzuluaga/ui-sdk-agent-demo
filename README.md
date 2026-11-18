@@ -14,3 +14,14 @@ await agent.act({ steps: [{ ref: "Pay", action: "press" }] })   # shows the appr
 ```
 
 Gotcha: a change the app cancels still returns `ok: true` (the step's `result` is `false`). Check `values`, not `ok`.
+
+## Talk to it through Claude
+
+`src/tools.ts` hands ui-sdk's `agentTools` (snapshot, act, query) to Claude. The browser runs the tool loop (`src/claude-loop.ts`) because the tools act on the page. The Vite dev server's `/api/claude` route (`server/claude.ts`) makes the call, so the API key stays on the server. It calls `claude-opus-5-5` at `medium` effort with server-side refusal fallbacks (`fallbacks: "default"`).
+
+```bash
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env.local   # gitignored
+npm run dev
+```
+
+Type a request in "Ask Claude" under the form. Each tool call shows up in the log. When Claude presses Pay, the Approve/Deny bar waits for you, and Claude hears your answer as the tool result.

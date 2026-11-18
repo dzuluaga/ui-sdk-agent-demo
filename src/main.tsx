@@ -1,5 +1,6 @@
 import { createAgent } from "@ui-sdk/react/agent"
 import { createRoot } from "react-dom/client"
+import { Chat } from "./chat"
 import { Checkout } from "./checkout"
 
 function askThePerson(text: string, signal: AbortSignal) {
@@ -17,12 +18,17 @@ function askThePerson(text: string, signal: AbortSignal) {
   })
 }
 
-createRoot(document.getElementById("root")!).render(<Checkout />)
-
 const agent = createAgent({
   allow: (step, { signal }) =>
     step.confirm ? askThePerson(step.confirm, signal) : true,
 })
+
+createRoot(document.getElementById("root")!).render(
+  <>
+    <Checkout />
+    <Chat agent={agent} />
+  </>
+)
 
 declare global {
   var agent: ReturnType<typeof createAgent>
