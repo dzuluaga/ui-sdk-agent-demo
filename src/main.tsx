@@ -1,34 +1,29 @@
-import { createAgent } from "@ui-sdk/react/agent"
+import { createAgent, registerTools } from "@ui-sdk/react/agent"
 import { createRoot } from "react-dom/client"
+import { askThePerson } from "./approval"
 import { Chat } from "./chat"
 import { Checkout } from "./checkout"
 import "./styles.css"
 import { Tasks } from "./tasks"
-
-function askThePerson(text: string, signal: AbortSignal) {
-  const bar = document.getElementById("approval")!
-  document.getElementById("approval-text")!.textContent = text
-  bar.toggleAttribute("data-open", true)
-  return new Promise<boolean>((resolve) => {
-    const answer = (yes: boolean) => () => {
-      bar.toggleAttribute("data-open", false)
-      resolve(yes)
-    }
-    document.getElementById("approve")!.onclick = answer(true)
-    document.getElementById("deny")!.onclick = answer(false)
-    signal.addEventListener("abort", answer(false))
-  })
-}
+import { installModelContext } from "./webmcp"
+import { registerTaskTools } from "./webmcp-tools"
 
 const agent = createAgent({
   allow: (step, { signal }) =>
     step.confirm ? askThePerson(step.confirm, signal) : true,
 })
 
+// WebMCP: ui-sdk's generated tools and the hand-written task tools both go
+// through document.modelContext. The bridge's allow above already asks the
+// person, so registerTools doesn't ask again.
+const webmcp = installModelContext()
+registerTools(agent, { allow: () => true })
+registerTaskTools()
+
 createRoot(document.getElementById("root")!).render(
   <>
     <Tasks />
-    <Chat agent={agent} />
+    <Chat nativeWebMCP={webmcp.native} />
     <Checkout />
   </>
 )

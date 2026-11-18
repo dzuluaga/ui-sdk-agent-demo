@@ -10,24 +10,29 @@ type Event =
   | { kind: "tool"; name: string; input: unknown; output: string; isError: boolean }
   | { kind: "text"; text: string }
   | { kind: "refusal"; category: string | null }
+// Runs one tool call: ui-sdk's bridge directly, or whatever the page
+// registered through WebMCP.
+type Toolbox = { run: (name: string, input: any) => Promise<{ output: unknown; isError: boolean }> }
 
-async function runTool(agent: Agent, name: string, input: any) {
-  if (name === "snapshot") return { output: agent.snapshot(), isError: false }
-  if (name === "act") {
-    const result = await agent.act(input)
-    return { output: result, isError: !result.ok }
-  }
-  if (name === "query") {
-    const result = await agent.query(input)
-    return { output: result, isError: "error" in result }
-  }
-  return { output: `Unknown tool ${name}`, isError: true }
-}
+const agentToolbox = (agent: Agent): Toolbox => ({
+  async run(name, input) {
+    if (name === "snapshot") return { output: agent.snapshot(), isError: false }
+    if (name === "act") {
+      const result = await agent.act(input)
+      return { output: result, isError: !result.ok }
+    }
+    if (name === "query") {
+      const result = await agent.query(input)
+      return { output: result, isError: "error" in result }
+    }
+    return { output: `Unknown tool ${name}`, isError: true }
+  },
+})
 
 async function runTurn(
   messages: Anthropic.Beta.BetaMessageParam[],
   callClaude: CallClaude,
-  agent: Agent,
+  toolbox: Toolbox,
   onEvent: (event: Event) => void
 ) {
   for (;;) {
@@ -47,8 +52,8 @@ async function runTurn(
     for (const block of response.content) {
       if (block.type !== "tool_use") continue
       onEvent({ kind: "call", name: block.name, input: block.input })
-      const { output, isError } = await runTool(agent, block.name, block.input)
-      const text = JSON.stringify(output)
+      const { output, isError } = await toolbox.run(block.name, block.input)
+      const text = typeof output === "string" ? output : JSON.stringify(output)
       onEvent({ kind: "tool", name: block.name, input: block.input, output: text, isError })
       results.push({ type: "tool_result", tool_use_id: block.id, content: text, is_error: isError })
     }
@@ -56,5 +61,5 @@ async function runTurn(
   }
 }
 
-export { runTurn }
-export type { CallClaude, Event }
+export { agentToolbox, runTurn }
+export type { CallClaude, Event, Toolbox }

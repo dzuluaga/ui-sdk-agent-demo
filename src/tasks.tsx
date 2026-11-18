@@ -6,35 +6,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@ui-sdk/react/select"
-import { useState } from "react"
-import type { Person } from "./assign-picker"
 import { AssignPicker } from "./assign-picker-react"
-
-const people: Person[] = [
-  { value: "jane", label: "Jane Doe" },
-  { value: "ravi", label: "Ravi Patel" },
-  { value: "mei", label: "Mei Chen" },
-  { value: "sam", label: "Sam Okafor" },
-]
-
-const statuses = [
-  { value: "todo", label: "To do" },
-  { value: "doing", label: "In progress" },
-  { value: "done", label: "Done" },
-]
-
-type Task = { id: string; title: string; assignee: string | null; status: string }
-
-const initialTasks: Task[] = [
-  { id: "t1", title: "Fix login bug", assignee: null, status: "todo" },
-  { id: "t2", title: "Write release notes", assignee: "ravi", status: "doing" },
-  { id: "t3", title: "Update stale onboarding doc", assignee: "mei", status: "todo" },
-]
+import { people, statuses, taskStore, useTasks } from "./task-store"
 
 function Tasks() {
-  const [tasks, setTasks] = useState(initialTasks)
-  const update = (id: string, patch: Partial<Task>) =>
-    setTasks((all) => all.map((task) => (task.id === id ? { ...task, ...patch } : task)))
+  const tasks = useTasks()
+  const update = taskStore.update
 
   return (
     <section className="card tasks" aria-labelledby="tasks-title">
@@ -74,7 +51,7 @@ function Tasks() {
             <Button
               aria-label={`Delete ${task.title}`}
               data-agent-confirm={`Deletes the task "${task.title}"`}
-              onClick={() => setTasks((all) => all.filter((t) => t.id !== task.id))}
+              onClick={() => taskStore.remove(task.id)}
             >
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />

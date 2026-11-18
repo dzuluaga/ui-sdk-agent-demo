@@ -192,3 +192,5 @@ h2 { font-size: 1rem; }
   #root > .tasks, #root > main { grid-column: 1; margin-inline: 0; }
   #root > .chat { grid-column: 2; grid-row: 1 / span 2; margin-inline: 0; position: sticky; top: 1.5rem; }
 }
+.chat .toolbar { display: flex; gap: 0.5rem; margin: 0.75rem 0; }
+.chat .toolbar [data-slot="select-trigger"] { flex: 1; min-width: 0; }

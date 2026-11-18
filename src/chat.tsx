@@ -1,20 +1,33 @@
 import type Anthropic from "@anthropic-ai/sdk"
-import type { createAgent } from "@ui-sdk/react/agent"
+import { agentTools } from "@ui-sdk/react/agent"
 import { Button } from "@ui-sdk/react/button"
 import { Input } from "@ui-sdk/react/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui-sdk/react/select"
 import { useRef, useState } from "react"
 import { runTurn, type CallClaude, type Event } from "./claude-loop"
+import { taskStore } from "./task-store"
+import { modelContextToolbox, modelContextTools } from "./webmcp"
 
-const callClaude: CallClaude = async (messages) => {
-  const response = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ messages }),
-  })
-  const body = await response.json()
-  if (!response.ok) throw new Error(body.error)
-  return body
-}
+const uiSdkNames = new Set(agentTools.map((tool) => tool.name))
+
+const toolSets = [
+  { value: "ui-sdk", label: "ui-sdk (generated)", has: (name: string) => uiSdkNames.has(name) },
+  { value: "webmcp", label: "Hand-written WebMCP", has: (name: string) => !uiSdkNames.has(name) },
+  { value: "both", label: "Both", has: () => true },
+]
+
+const callClaudeWith =
+  (tools: Anthropic.Beta.BetaTool[]): CallClaude =>
+  async (messages) => {
+    const response = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages, tools }),
+    })
+    const body = await response.json()
+    if (!response.ok) throw new Error(body.error)
+    return body
+  }
 
 type Line = { who: "you" | "claude" | "tool" | "error"; text: string }
 
@@ -24,7 +37,10 @@ type Entry = { ref: string; label?: string; items?: { value: string; label: stri
 // Claude may name a component by its ref ("c1") and an item by its value ("jane");
 // show both by their labels from the last snapshot so the log reads like the page.
 function describeCall(name: string, input: any, page: Entry[]) {
-  if (name !== "act") return `${name}()`
+  if (name !== "act") {
+    const args = Object.values(input ?? {}).map((a) => JSON.stringify(a))
+    return `${name}(${args.join(", ")})`
+  }
   const steps = (input?.steps ?? []) as Step[]
   return steps
     .map((s) => {
@@ -39,9 +55,13 @@ function describeCall(name: string, input: any, page: Entry[]) {
 }
 
 function describeResult(name: string, output: string, isError: boolean) {
-  const parsed = JSON.parse(output)
+  let parsed: any = output
+  try {
+    parsed = JSON.parse(output)
+  } catch {}
   if (name === "snapshot" && Array.isArray(parsed)) return `${parsed.length} components on the page`
-  if (isError) return `✗ ${parsed.error?.message ?? output}`
+  if (name === "list_tasks" && Array.isArray(parsed)) return `${parsed.length} tasks`
+  if (isError) return `✗ ${parsed?.error?.message ?? output}`
   return output.length > 120 ? "✓ done" : `✓ ${output}`
 }
 
@@ -53,22 +73,23 @@ function describe(event: Event, page: Entry[]): Line {
   return { who: "tool", text: describeResult(event.name, event.output, event.isError) }
 }
 
-function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
+function Chat({ nativeWebMCP }: { nativeWebMCP: boolean }) {
   const messages = useRef<Anthropic.Beta.BetaMessageParam[]>([])
   const [lines, setLines] = useState<Line[]>([])
   const [busy, setBusy] = useState(false)
+  const [toolSet, setToolSet] = useState("ui-sdk")
 
   async function send(text: string) {
     setBusy(true)
     setLines((prev) => [...prev, { who: "you", text }])
     messages.current.push({ role: "user", content: text })
+    const tools = modelContextTools(toolSets.find((set) => set.value === toolSet)!.has)
     try {
       let page: Entry[] = []
-      await runTurn(messages.current, callClaude, agent, (event) => {
+      await runTurn(messages.current, callClaudeWith(tools), modelContextToolbox, (event) => {
         if (event.kind === "tool" && event.name === "snapshot" && !event.isError)
           page = JSON.parse(event.output)
-        const line = describe(event, page)
-        setLines((prev) => [...prev, line])
+        setLines((prev) => [...prev, describe(event, page)])
       })
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error)
@@ -77,10 +98,36 @@ function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
     setBusy(false)
   }
 
+  function reset() {
+    messages.current = []
+    setLines([])
+    taskStore.reset()
+  }
+
   return (
     <section data-agent-hidden aria-label="Chat with Claude" className="chat">
       <h2>Ask Claude</h2>
-      <p className="product">Claude works the tasks and the checkout through ui-sdk's agent tools.</p>
+      <p className="product">
+        Claude uses the tools this page registered through WebMCP
+        {nativeWebMCP ? " (also passed to the browser's own)" : ""}.
+      </p>
+      <div className="toolbar">
+        <Select items={toolSets} value={toolSet} onValueChange={(value) => value && setToolSet(value)}>
+          <SelectTrigger aria-label="Tools" disabled={busy}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {toolSets.map((set) => (
+              <SelectItem key={set.value} value={set.value}>
+                {set.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button onClick={reset} disabled={busy}>
+          Reset
+        </Button>
+      </div>
       <ol>
         {lines.map((line, i) => (
           <li key={i} data-who={line.who}>
@@ -100,7 +147,7 @@ function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
           name="prompt"
           aria-label="Message"
           disabled={busy}
-          placeholder="Check out with express shipping and gift wrap…"
+          placeholder="Assign the login bug to Jane…"
         />
         <Button type="submit" data-variant="solid" disabled={busy}>
           {busy ? "Working…" : "Send"}

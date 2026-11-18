@@ -49,6 +49,27 @@ npm run dev
 
 Type "assign the login bug to Jane, mark it in progress, and delete the stale task" in "Ask Claude". Each tool call shows up in the log, and the Delete waits for you.
 
+## WebMCP: hand-written tools vs ui-sdk's generated ones
+
+The page registers two tool sets through `document.modelContext.registerTool` (`src/webmcp.ts` records them for the in-page Claude, and passes them on to the browser's own WebMCP where it has one: Chrome 146+ with `chrome://flags/#enable-webmcp-testing`, where DevTools' Application panel lists them):
+
+- **ui-sdk, generated:** `registerTools(agent, { allow })`, one line. `snapshot`, `act` and `query` over every component on the page.
+- **Hand-written:** `src/webmcp-tools.ts`, 96 lines. `list_tasks`, `assign_task`, `set_status` and `delete_task`, written against the app's data, each checking its own arguments.
+
+Pick the set in Ask Claude's Tools menu. Results with `claude-opus-5-5` on 2026-11-18:
+
+| Request | ui-sdk | Hand-written | Both |
+| --- | --- | --- | --- |
+| "Assign the login bug to Jane, mark it in progress, and delete the stale task" | 2 calls (snapshot, one act), ~5 s, waits at Delete | 4 calls (list, assign, status, delete), ~6 s, waits at Delete | Claude picks the hand-written tools |
+| "In the checkout, choose express shipping and turn on gift wrap" | works | "none of the tools this page gives me work with the checkout" | Claude uses ui-sdk's act; total $50 |
+
+What it shows:
+
+- **Named tools win when they exist.** Given both, Claude chose `assign_task` over `act`. They read like the business operation and need no snapshot.
+- **Hand-written tools only cover what someone wrote.** The checkout has no hand-written tools, so that agent can't touch it. ui-sdk's one line covers every component, including ones added later.
+- **The approval isn't free with WebMCP.** The spec has no confirmation API yet (only a `consequentialHint` annotation the browser may act on), so `delete_task` asks the person in its own code. Forget that line and the agent deletes without asking. With ui-sdk, `data-agent-confirm` on the button covers every path to it.
+- **Both use one channel.** ui-sdk's tools are WebMCP tools; a page can offer named tools for its key operations and ui-sdk for the rest of the screen.
+
 ## What this shows
 
 - **An API the UI exposes to agents.** `snapshot()` lists each component, its label, value, items and actions. `act()` calls an action through the component's own change path, so app state, callbacks and rules run as they would for a person, and the person sees it happen.

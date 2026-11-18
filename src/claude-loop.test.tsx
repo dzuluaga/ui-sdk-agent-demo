@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react"
 import { createAgent } from "@ui-sdk/react/agent"
 import { expect, test } from "vitest"
 import { Checkout } from "./checkout"
-import { runTurn, type CallClaude, type Event } from "./claude-loop"
+import { agentToolbox, runTurn, type CallClaude, type Event } from "./claude-loop"
 
 let approve = false
 const agent = createAgent({ allow: (step) => !step.confirm || approve })
@@ -40,7 +40,7 @@ test("the loop runs Claude's tool calls against the page and sends back results"
     { role: "user", content: "Check out with express and gift wrap" },
   ]
 
-  await runTurn(messages, callClaude, agent, (event) => events.push(event))
+  await runTurn(messages, callClaude, agentToolbox(agent), (event) => events.push(event))
 
   expect(sent).toHaveLength(3)
   expect(screen.getByRole("status", { name: "Total" }).textContent).toBe("Total: $50")
