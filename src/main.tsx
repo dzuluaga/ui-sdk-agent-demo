@@ -2,6 +2,7 @@ import { createAgent } from "@ui-sdk/react/agent"
 import { createRoot } from "react-dom/client"
 import { Chat } from "./chat"
 import { Checkout } from "./checkout"
+import "./styles.css"
 
 function askThePerson(text: string, signal: AbortSignal) {
   const bar = document.getElementById("approval")!

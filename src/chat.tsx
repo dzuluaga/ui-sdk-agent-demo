@@ -1,5 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk"
 import type { createAgent } from "@ui-sdk/react/agent"
+import { Button } from "@ui-sdk/react/button"
+import { Input } from "@ui-sdk/react/input"
 import { useRef, useState } from "react"
 import { runTurn, type CallClaude, type Event } from "./claude-loop"
 
@@ -41,7 +43,8 @@ function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
         setLines((prev) => [...prev, describe(event)])
       )
     } catch (error) {
-      setLines((prev) => [...prev, { who: "error", text: String(error) }])
+      const text = error instanceof Error ? error.message : String(error)
+      setLines((prev) => [...prev, { who: "error", text }])
     }
     setBusy(false)
   }
@@ -49,10 +52,11 @@ function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
   return (
     <section data-agent-hidden aria-label="Chat with Claude" className="chat">
       <h2>Ask Claude</h2>
+      <p className="product">Claude fills the form above through ui-sdk's agent tools.</p>
       <ol>
         {lines.map((line, i) => (
           <li key={i} data-who={line.who}>
-            <b>{line.who}:</b> {line.text}
+            {line.who === "tool" ? `↳ ${line.text}` : line.text}
           </li>
         ))}
       </ol>
@@ -64,8 +68,15 @@ function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
           input.value = ""
         }}
       >
-        <input name="prompt" aria-label="Message" disabled={busy} placeholder="Check out with express shipping and gift wrap, email me@example.com, card 4242424242424242" />
-        <button disabled={busy}>{busy ? "Working…" : "Send"}</button>
+        <Input
+          name="prompt"
+          aria-label="Message"
+          disabled={busy}
+          placeholder="Check out with express shipping and gift wrap…"
+        />
+        <Button type="submit" data-variant="solid" disabled={busy}>
+          {busy ? "Working…" : "Send"}
+        </Button>
       </form>
     </section>
   )

@@ -30,7 +30,8 @@ function claudeRoute(apiKey: string | undefined): Connect.NextHandleFunction {
       res.end(JSON.stringify(response))
     } catch (error) {
       res.statusCode = error instanceof Anthropic.APIError ? (error.status ?? 500) : 500
-      res.end(JSON.stringify({ error: String(error) }))
+      const message = error instanceof Error ? error.message : String(error)
+      res.end(JSON.stringify({ error: message }))
     }
   }
 }
