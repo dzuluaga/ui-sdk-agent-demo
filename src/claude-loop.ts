@@ -6,6 +6,7 @@ type CallClaude = (
   messages: Anthropic.Beta.BetaMessageParam[]
 ) => Promise<Anthropic.Beta.BetaMessage>
 type Event =
+  | { kind: "call"; name: string; input: unknown }
   | { kind: "tool"; name: string; input: unknown; output: string; isError: boolean }
   | { kind: "text"; text: string }
   | { kind: "refusal"; category: string | null }
@@ -45,6 +46,7 @@ async function runTurn(
     const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
     for (const block of response.content) {
       if (block.type !== "tool_use") continue
+      onEvent({ kind: "call", name: block.name, input: block.input })
       const { output, isError } = await runTool(agent, block.name, block.input)
       const text = JSON.stringify(output)
       onEvent({ kind: "tool", name: block.name, input: block.input, output: text, isError })

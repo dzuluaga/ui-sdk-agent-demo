@@ -18,15 +18,39 @@ const callClaude: CallClaude = async (messages) => {
 
 type Line = { who: "you" | "claude" | "tool" | "error"; text: string }
 
-function describe(event: Event): Line {
+type Step = { ref: string; action: string; args?: unknown[] }
+type Entry = { ref: string; label?: string; items?: { value: string; label: string }[] }
+
+// Claude may name a component by its ref ("c1") and an item by its value ("jane");
+// show both by their labels from the last snapshot so the log reads like the page.
+function describeCall(name: string, input: any, page: Entry[]) {
+  if (name !== "act") return `${name}()`
+  const steps = (input?.steps ?? []) as Step[]
+  return steps
+    .map((s) => {
+      const entry = page.find((e) => e.ref === s.ref)
+      const args = (s.args ?? []).map((a) => {
+        const item = entry?.items?.find((i) => i.value === a)
+        return JSON.stringify(item?.label ?? a)
+      })
+      return `${s.action}(${args.join(", ")}) on “${entry?.label ?? s.ref}”`
+    })
+    .join("\n")
+}
+
+function describeResult(name: string, output: string, isError: boolean) {
+  const parsed = JSON.parse(output)
+  if (name === "snapshot" && Array.isArray(parsed)) return `${parsed.length} components on the page`
+  if (isError) return `✗ ${parsed.error?.message ?? output}`
+  return output.length > 120 ? "✓ done" : `✓ ${output}`
+}
+
+function describe(event: Event, page: Entry[]): Line {
   if (event.kind === "text") return { who: "claude", text: event.text }
   if (event.kind === "refusal")
     return { who: "error", text: `Claude declined (${event.category ?? "no category"})` }
-  const output = event.output.length > 300 ? `${event.output.slice(0, 300)}…` : event.output
-  return {
-    who: "tool",
-    text: `${event.name}(${JSON.stringify(event.input)})${event.isError ? " ✗" : ""} → ${output}`,
-  }
+  if (event.kind === "call") return { who: "tool", text: describeCall(event.name, event.input, page) }
+  return { who: "tool", text: describeResult(event.name, event.output, event.isError) }
 }
 
 function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
@@ -39,9 +63,13 @@ function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
     setLines((prev) => [...prev, { who: "you", text }])
     messages.current.push({ role: "user", content: text })
     try {
-      await runTurn(messages.current, callClaude, agent, (event) =>
-        setLines((prev) => [...prev, describe(event)])
-      )
+      let page: Entry[] = []
+      await runTurn(messages.current, callClaude, agent, (event) => {
+        if (event.kind === "tool" && event.name === "snapshot" && !event.isError)
+          page = JSON.parse(event.output)
+        const line = describe(event, page)
+        setLines((prev) => [...prev, line])
+      })
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error)
       setLines((prev) => [...prev, { who: "error", text }])

@@ -97,6 +97,7 @@ h2 { font-size: 1rem; }
 .chat li[data-who="you"] { background: var(--accent); color: white; justify-self: end; max-width: 85%; }
 .chat li[data-who="claude"] { justify-self: start; max-width: 85%; }
 .chat li[data-who="tool"] {
+  white-space: pre-line;
   background: none;
   padding: 0 0.25rem;
   color: var(--ui-muted-foreground);
@@ -177,4 +178,17 @@ h2 { font-size: 1rem; }
   color: white;
   font-size: 0.625rem;
   font-weight: 600;
+}
+
+/* Wide screens: the chat sits beside the page it operates. */
+@media (min-width: 72rem) {
+  #root {
+    display: grid;
+    grid-template-columns: 40rem 26rem;
+    justify-content: center;
+    align-items: start;
+    column-gap: 1.5rem;
+  }
+  #root > .tasks, #root > main { grid-column: 1; margin-inline: 0; }
+  #root > .chat { grid-column: 2; grid-row: 1 / span 2; margin-inline: 0; position: sticky; top: 1.5rem; }
 }

@@ -2,9 +2,9 @@
 
 A small app built with [ui-sdk](https://github.com/vercel-labs/ui) (`0.1.0-beta.6`) that a person and an agent operate on the same screen. The agent doesn't click pixels or guess selectors: it reads the components the page exposes and calls their actions by name, and the app decides what it may do.
 
-![An agent assigns the login bug to Jane through a custom picker, sets it to In progress, then stops at Delete until a person approves](docs/ui-sdk-agent-aha.gif)
+![Claude reads the page with one snapshot, assigns the login bug to Jane through a custom picker, sets it to In progress, then stops at Delete until a person approves](docs/ui-sdk-claude-live.gif)
 
-<sub>Recorded from the console steps under "Drive it as an agent" below; the captions were added for the recording.</sub>
+<sub>A live run: the request typed into Ask Claude, answered by `claude-opus-5-5` through ui-sdk's agent tools. The checkout was hidden for the recording.</sub>
 
 ```bash
 npm install
@@ -32,7 +32,9 @@ await agent.act({ steps: [
 ] })
 ```
 
-The first two steps run; the Delete stops at "Claude wants to: Deletes the task …" until a person clicks Approve or Deny. Naming someone who isn't on the team (`"Bob"`) fails with the real list of people.
+The first two steps run; the Delete stops at "Claude wants to: Deletes the task …" until a person clicks Approve or Deny.
+
+![The same three steps from the console, one at a time, with captions](docs/ui-sdk-agent-aha.gif) Naming someone who isn't on the team (`"Bob"`) fails with the real list of people.
 
 Gotcha: a change the app cancels still returns `ok: true` (the step's `result` is `false`). Check `values`, not `ok`.
 
