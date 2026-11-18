@@ -52,7 +52,7 @@ function Chat({ agent }: { agent: ReturnType<typeof createAgent> }) {
   return (
     <section data-agent-hidden aria-label="Chat with Claude" className="chat">
       <h2>Ask Claude</h2>
-      <p className="product">Claude fills the form above through ui-sdk's agent tools.</p>
+      <p className="product">Claude works the tasks and the checkout through ui-sdk's agent tools.</p>
       <ol>
         {lines.map((line, i) => (
           <li key={i} data-who={line.who}>
