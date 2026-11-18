@@ -2,6 +2,10 @@
 
 A small app built with [ui-sdk](https://github.com/vercel-labs/ui) (`0.1.0-beta.6`) that a person and an agent operate on the same screen. The agent doesn't click pixels or guess selectors: it reads the components the page exposes and calls their actions by name, and the app decides what it may do.
 
+![An agent assigns the login bug to Jane through a custom picker, sets it to In progress, then stops at Delete until a person approves](docs/ui-sdk-agent-aha.gif)
+
+<sub>Recorded from the console steps under "Drive it as an agent" below; the captions were added for the recording.</sub>
+
 ```bash
 npm install
 npm test        # agent tests in jsdom (add --silent=false to see the snapshot)
