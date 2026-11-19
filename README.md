@@ -38,6 +38,22 @@ The first two steps run; the Delete stops at "Claude wants to: Deletes the task 
 
 Gotcha: a change the app cancels still returns `ok: true` (the step's `result` is `false`). Check `values`, not `ok`.
 
+### Requests are data, behavior is code
+
+`agent.act` takes a plain object, a list of `{ ref, action, args }` steps:
+
+- `ref` is a component's name (its label) or the short id from a snapshot (`"c1"`).
+- `action` must be one the component lists in its `actions` (`setValue`, `setOpen`, `press`…).
+- `args` are the action's arguments; an option can be given by label (`"Mei Chen"`) or value (`"mei"`).
+
+An unknown name, an action the component doesn't offer, or an option that doesn't exist returns an error instead of doing something. Steps marked `data-agent-confirm` still wait for a person.
+
+The behavior itself is code. What a component can do, and how (keyboard handling, filtering, focus, what `setValue` does, which actions an agent may call), is TypeScript in `definePrimitive` (`src/assign-picker.ts`); ui-sdk's own Select and Popover are built the same way. Only two things are data: the agent's requests (the steps) and what the page reports back (the snapshot: names, values, options, actions).
+
+It works like an HTTP API: the request body is JSON, the server's logic is code. Here the components are the server and `act` is the endpoint. Agents get a data interface because data is what a model can produce. Claude can't click, but it can emit `{ action: "setValue", args: ["Mei Chen"] }`. It can only ask for actions a component lists, never run its own code in the page.
+
+A person never goes through this. Clicks and key presses call the same component code directly, so a person and an agent both end up in the same `setValue`.
+
 ## Talk to it through Claude
 
 `src/tools.ts` hands ui-sdk's `agentTools` (snapshot, act, query) to Claude. The browser runs the tool loop (`src/claude-loop.ts`) because the tools act on the page. The Vite dev server's `/api/claude` route (`server/claude.ts`) makes the call, so the API key stays on the server.
@@ -48,6 +64,17 @@ npm run dev
 ```
 
 Type "assign the login bug to Jane, mark it in progress, and delete the stale task" in "Ask Claude". Each tool call shows up in the log, and the Delete waits for you.
+
+### Claude decides, the page acts
+
+Claude never touches the DOM or runs code in the page. On the Direct route:
+
+1. Claude, on Anthropic's servers, gets the message and the tool definitions, and replies with a tool call as JSON: `act` with setValue "Mei Chen" on "Assignee for Fix login bug".
+2. The page's own loop (`src/claude-loop.ts`) parses it and calls `agent.act(...)`.
+3. ui-sdk finds the component by name and calls its `setValue`, the same path a click takes. React re-renders, and that's how the DOM changes.
+4. The result goes back to Claude, and the loop repeats until Claude replies in text.
+
+That's the Messages API with a small tool loop the page owns, not the Claude Agent SDK. The WebMCP route differs only in step 2: the loop hands the call to Chrome's `executeTool`, and Chrome calls the same tool.
 
 ## WebMCP: hand-written tools vs ui-sdk's generated ones
 
