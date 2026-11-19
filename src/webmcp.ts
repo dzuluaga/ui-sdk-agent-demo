@@ -12,6 +12,9 @@ type ModelContextTool = {
 
 type ModelContext = {
   registerTool: (tool: ModelContextTool, options?: { signal?: AbortSignal }) => Promise<void>
+  // Chrome's native one also lets an agent in the page find and run tools.
+  getTools?: () => Promise<{ name: string }[]>
+  executeTool?: (tool: { name: string }, input: object) => Promise<string>
 }
 
 declare global {
@@ -21,17 +24,18 @@ declare global {
 }
 
 const registered = new Map<string, ModelContextTool>()
+let native: ModelContext | undefined
 
 // Records every tool the page registers so the in-page Claude can call them,
 // and passes each one on to the browser's own document.modelContext when it
 // has one. Without a native one this stands in for it.
 function installModelContext() {
-  const native = document.modelContext
+  native = document.modelContext
   const context: ModelContext = {
     registerTool(tool, options) {
       registered.set(tool.name, tool)
       options?.signal?.addEventListener("abort", () => registered.delete(tool.name))
-      return native ? native.registerTool.call(native, tool, options) : Promise.resolve()
+      return native ? native.registerTool(tool, options) : Promise.resolve()
     },
   }
   Object.defineProperty(document, "modelContext", { value: context, configurable: true })
@@ -49,14 +53,31 @@ function modelContextTools(names: (name: string) => boolean): Anthropic.Beta.Bet
     }))
 }
 
-// How the in-page Claude calls them: through each tool's execute, as a
-// browser agent would.
+// Runs a tool through the browser's WebMCP when it has one, so the call shows
+// up in DevTools (Application → WebMCP → Tool Activity); otherwise straight
+// through the tool's own execute.
+async function execute(name: string, input: object) {
+  if (native?.getTools && native.executeTool) {
+    const tool = (await native.getTools()).find((t) => t.name === name)
+    if (tool) {
+      const text = await native.executeTool(tool, input ?? {})
+      try {
+        return JSON.parse(text)
+      } catch {
+        return text
+      }
+    }
+  }
+  const tool = registered.get(name)
+  if (!tool) throw new Error(`No WebMCP tool named ${name}`)
+  return tool.execute(input)
+}
+
+// How the in-page Claude calls them, as a browser agent would.
 const modelContextToolbox: Toolbox = {
   async run(name, input) {
-    const tool = registered.get(name)
-    if (!tool) return { output: `No WebMCP tool named ${name}`, isError: true }
     try {
-      const output: any = await tool.execute(input)
+      const output: any = await execute(name, input)
       const failed = output?.ok === false || (output && typeof output === "object" && "error" in output)
       return { output, isError: Boolean(failed) }
     } catch (error) {

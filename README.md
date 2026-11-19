@@ -51,7 +51,7 @@ Type "assign the login bug to Jane, mark it in progress, and delete the stale ta
 
 ## WebMCP: hand-written tools vs ui-sdk's generated ones
 
-The page registers two tool sets through `document.modelContext.registerTool` (`src/webmcp.ts` records them for the in-page Claude, and passes them on to the browser's own WebMCP where it has one: Chrome 146+ with `chrome://flags/#enable-webmcp-testing`, where DevTools' Application panel lists them):
+The page registers two tool sets through `document.modelContext.registerTool`. `src/webmcp.ts` records them, and passes them on to the browser's own WebMCP where it has one: Chrome 146+ with `chrome://flags/#enable-webmcp-testing`, after a full restart. There, Ask Claude calls every tool through Chrome's `executeTool`, so DevTools → Application → WebMCP lists the tools and shows each call under Tool Activity. Chrome replaces a thrown error with a generic `UnknownError`, so the hand-written tools return `{ error }` instead of throwing.
 
 - **ui-sdk, generated:** `registerTools(agent, { allow })`, one line. `snapshot`, `act` and `query` over every component on the page.
 - **Hand-written:** `src/webmcp-tools.ts`, 96 lines. `list_tasks`, `assign_task`, `set_status` and `delete_task`, written against the app's data, each checking its own arguments.

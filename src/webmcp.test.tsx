@@ -40,7 +40,7 @@ test("a hand-written tool changes the same screen a person uses", async () => {
 
   const wrong = await run("assign_task", { task: "login", person: "Bob" })
   expect(wrong.isError).toBe(true)
-  expect(wrong.output).toContain("Choices: Jane Doe, Ravi Patel, Mei Chen, Sam Okafor")
+  expect((wrong.output as { error: string }).error).toContain("Choices: Jane Doe, Ravi Patel, Mei Chen, Sam Okafor")
 })
 
 test("ui-sdk's generated act goes through the same registry and keeps its confirm", async () => {
@@ -65,6 +65,6 @@ test("the hand-written delete asks the person itself", async () => {
     'Deletes the task "Update stale onboarding doc"'
   )
   document.getElementById("deny")!.click()
-  expect((await pending).output).toBe("The person said no.")
+  expect((await pending).output).toEqual({ error: "The person said no." })
   expect(screen.getByText("Update stale onboarding doc")).toBeTruthy()
 })

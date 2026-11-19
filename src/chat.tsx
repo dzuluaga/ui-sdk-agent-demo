@@ -61,7 +61,7 @@ function describeResult(name: string, output: string, isError: boolean) {
   } catch {}
   if (name === "snapshot" && Array.isArray(parsed)) return `${parsed.length} components on the page`
   if (name === "list_tasks" && Array.isArray(parsed)) return `${parsed.length} tasks`
-  if (isError) return `✗ ${parsed?.error?.message ?? output}`
+  if (isError) return `✗ ${parsed?.error?.message ?? parsed?.error ?? output}`
   return output.length > 120 ? "✓ done" : `✓ ${output}`
 }
 

@@ -27,8 +27,22 @@ const taskArg = { task: { type: "string", description: "The task's title, or a u
 
 function registerTaskTools() {
   const controller = new AbortController()
+  // A tool that throws reaches the agent as Chrome's generic "UnknownError",
+  // so each one returns { error } instead, which keeps the message.
   const register = (tool: Parameters<NonNullable<Document["modelContext"]>["registerTool"]>[0]) =>
-    document.modelContext?.registerTool(tool, { signal: controller.signal })
+    document.modelContext?.registerTool(
+      {
+        ...tool,
+        execute: async (input, client) => {
+          try {
+            return await tool.execute(input, client)
+          } catch (error) {
+            return { error: error instanceof Error ? error.message : String(error) }
+          }
+        },
+      },
+      { signal: controller.signal }
+    )
 
   register({
     name: "list_tasks",
