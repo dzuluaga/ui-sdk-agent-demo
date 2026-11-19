@@ -56,7 +56,7 @@ The page registers two tool sets through `document.modelContext.registerTool`. `
 - **ui-sdk, generated:** `registerTools(agent, { allow })`, one line. `snapshot`, `act` and `query` over every component on the page.
 - **Hand-written:** `src/webmcp-tools.ts`, 96 lines. `list_tasks`, `assign_task`, `set_status` and `delete_task`, written against the app's data, each checking its own arguments.
 
-Pick the set in Ask Claude's Tools menu. Results with `claude-opus-5-5` on 2026-11-18:
+Pick the set with the "Claude's tools" switch in Ask Claude. Results with `claude-opus-5-5` on 2026-11-18:
 
 | Request | ui-sdk | Hand-written | Both |
 | --- | --- | --- | --- |

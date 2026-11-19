@@ -2,7 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk"
 import { agentTools } from "@ui-sdk/react/agent"
 import { Button } from "@ui-sdk/react/button"
 import { Input } from "@ui-sdk/react/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui-sdk/react/select"
+import { SegmentedControl, SegmentedControlItem } from "@ui-sdk/react/segmented-control"
 import { useRef, useState } from "react"
 import { runTurn, type CallClaude, type Event } from "./claude-loop"
 import { taskStore } from "./task-store"
@@ -11,9 +11,24 @@ import { modelContextToolbox, modelContextTools } from "./webmcp"
 const uiSdkNames = new Set(agentTools.map((tool) => tool.name))
 
 const toolSets = [
-  { value: "ui-sdk", label: "ui-sdk (generated)", has: (name: string) => uiSdkNames.has(name) },
-  { value: "webmcp", label: "Hand-written WebMCP", has: (name: string) => !uiSdkNames.has(name) },
-  { value: "both", label: "Both", has: () => true },
+  {
+    value: "ui-sdk",
+    label: "ui-sdk",
+    detail: "snapshot, act and query, generated from every component on the page.",
+    has: (name: string) => uiSdkNames.has(name),
+  },
+  {
+    value: "webmcp",
+    label: "Hand-written",
+    detail: "list_tasks, assign_task, set_status and delete_task, written for the task list only.",
+    has: (name: string) => !uiSdkNames.has(name),
+  },
+  {
+    value: "both",
+    label: "Both",
+    detail: "All seven tools; Claude picks.",
+    has: () => true,
+  },
 ]
 
 const callClaudeWith =
@@ -106,27 +121,31 @@ function Chat({ nativeWebMCP }: { nativeWebMCP: boolean }) {
 
   return (
     <section data-agent-hidden aria-label="Chat with Claude" className="chat">
-      <h2>Ask Claude</h2>
+      <header>
+        <h2>Ask Claude</h2>
+        <Button className="start-over" onClick={reset} disabled={busy || lines.length === 0}>
+          Start over
+        </Button>
+      </header>
       <p className="product">
         Claude uses the tools this page registered through WebMCP
-        {nativeWebMCP ? " (also passed to the browser's own)" : ""}.
+        {nativeWebMCP ? ", passed on to the browser's own" : ""}.
       </p>
-      <div className="toolbar">
-        <Select items={toolSets} value={toolSet} onValueChange={(value) => value && setToolSet(value)}>
-          <SelectTrigger aria-label="Tools" disabled={busy}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {toolSets.map((set) => (
-              <SelectItem key={set.value} value={set.value}>
-                {set.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button onClick={reset} disabled={busy}>
-          Reset
-        </Button>
+      <div className="tool-set">
+        <span id="tool-set-label">Claude's tools</span>
+        <SegmentedControl
+          aria-labelledby="tool-set-label"
+          value={toolSet}
+          disabled={busy}
+          onValueChange={(value) => value && setToolSet(value)}
+        >
+          {toolSets.map((set) => (
+            <SegmentedControlItem key={set.value} value={set.value}>
+              {set.label}
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
+        <p>{toolSets.find((set) => set.value === toolSet)!.detail}</p>
       </div>
       <ol>
         {lines.map((line, i) => (
