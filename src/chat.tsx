@@ -32,17 +32,28 @@ const toolSets = [
 ]
 
 const routes = [
-  {
-    value: "webmcp",
-    label: "Through WebMCP",
-    detail: "Each call goes through the browser's WebMCP, so DevTools shows it under Tool Activity.",
-  },
-  {
-    value: "direct",
-    label: "Direct",
-    detail: "The page calls the tools itself: agent.act() for generated ones, your function for yours. No WebMCP, so Tool Activity stays empty.",
-  },
+  { value: "webmcp", label: "Through WebMCP" },
+  { value: "direct", label: "Direct" },
 ]
+
+// What actually happens for this pair of choices.
+function routeDetail(toolSet: string, route: string) {
+  const who =
+    toolSet === "ui-sdk"
+      ? route === "webmcp"
+        ? "ui-sdk registered snapshot, act and query with WebMCP (registerTools(agent))."
+        : "The page calls agent.snapshot(), agent.query() and agent.act() itself."
+      : toolSet === "webmcp"
+        ? route === "webmcp"
+          ? "Your four tools are registered with WebMCP (registerTaskTools())."
+          : "The page calls your tools' execute functions itself."
+        : route === "webmcp"
+          ? "ui-sdk's three tools (registerTools(agent)) and your four (registerTaskTools()) are all registered with WebMCP."
+          : "The page calls them itself: agent.act() for ui-sdk's tools, your execute functions for yours."
+  return route === "webmcp"
+    ? `${who} Each call goes through Chrome's executeTool, so DevTools shows it under Tool Activity.`
+    : `${who} No WebMCP, so Tool Activity stays empty.`
+}
 
 const callClaudeWith =
   (tools: Anthropic.Beta.BetaTool[]): CallClaude =>
@@ -186,7 +197,7 @@ function Chat({ agent, nativeWebMCP }: { agent: Agent; nativeWebMCP: boolean }) 
             </SegmentedControlItem>
           ))}
         </SegmentedControl>
-        <p>{routes.find((r) => r.value === route)!.detail}</p>
+        <p>{routeDetail(toolSet, route)}</p>
       </div>
       <ol>
         {lines.map((line, i) => (
