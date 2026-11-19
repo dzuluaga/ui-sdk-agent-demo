@@ -1,12 +1,12 @@
 import type Anthropic from "@anthropic-ai/sdk"
-import { agentTools } from "@ui-sdk/react/agent"
+import { agentTools, type createAgent } from "@ui-sdk/react/agent"
 import { Button } from "@ui-sdk/react/button"
 import { Input } from "@ui-sdk/react/input"
 import { SegmentedControl, SegmentedControlItem } from "@ui-sdk/react/segmented-control"
 import { useRef, useState } from "react"
-import { runTurn, type CallClaude, type Event } from "./claude-loop"
+import { agentToolbox, runTurn, type CallClaude, type Event, type Toolbox } from "./claude-loop"
 import { taskStore } from "./task-store"
-import { modelContextToolbox, modelContextTools } from "./webmcp"
+import { directToolbox, modelContextToolbox, modelContextTools } from "./webmcp"
 
 const uiSdkNames = new Set(agentTools.map((tool) => tool.name))
 
@@ -28,6 +28,19 @@ const toolSets = [
     label: "Both",
     detail: "All seven tools; Claude picks.",
     has: () => true,
+  },
+]
+
+const routes = [
+  {
+    value: "webmcp",
+    label: "WebMCP",
+    detail: "Each call goes through the browser's WebMCP, so DevTools shows it under Tool Activity.",
+  },
+  {
+    value: "direct",
+    label: "Direct",
+    detail: "ui-sdk calls go straight to agent.act(), hand-written ones to their own functions. No WebMCP, so Tool Activity stays empty.",
   },
 ]
 
@@ -75,6 +88,7 @@ function describeResult(name: string, output: string, isError: boolean) {
     parsed = JSON.parse(output)
   } catch {}
   if (name === "snapshot" && Array.isArray(parsed)) return `${parsed.length} components on the page`
+  if (name === "query" && Array.isArray(parsed)) return `${parsed.length} matching components`
   if (name === "list_tasks" && Array.isArray(parsed)) return `${parsed.length} tasks`
   if (isError) return `✗ ${parsed?.error?.message ?? parsed?.error ?? output}`
   return output.length > 120 ? "✓ done" : `✓ ${output}`
@@ -88,11 +102,20 @@ function describe(event: Event, page: Entry[]): Line {
   return { who: "tool", text: describeResult(event.name, event.output, event.isError) }
 }
 
-function Chat({ nativeWebMCP }: { nativeWebMCP: boolean }) {
+type Agent = ReturnType<typeof createAgent>
+
+function Chat({ agent, nativeWebMCP }: { agent: Agent; nativeWebMCP: boolean }) {
   const messages = useRef<Anthropic.Beta.BetaMessageParam[]>([])
   const [lines, setLines] = useState<Line[]>([])
   const [busy, setBusy] = useState(false)
   const [toolSet, setToolSet] = useState("ui-sdk")
+  const [route, setRoute] = useState("webmcp")
+
+  function toolbox(): Toolbox {
+    if (route === "webmcp") return modelContextToolbox
+    const uiSdk = agentToolbox(agent)
+    return { run: (name, input) => (uiSdkNames.has(name) ? uiSdk : directToolbox).run(name, input) }
+  }
 
   async function send(text: string) {
     setBusy(true)
@@ -101,9 +124,13 @@ function Chat({ nativeWebMCP }: { nativeWebMCP: boolean }) {
     const tools = modelContextTools(toolSets.find((set) => set.value === toolSet)!.has)
     try {
       let page: Entry[] = []
-      await runTurn(messages.current, callClaudeWith(tools), modelContextToolbox, (event) => {
-        if (event.kind === "tool" && event.name === "snapshot" && !event.isError)
-          page = JSON.parse(event.output)
+      await runTurn(messages.current, callClaudeWith(tools), toolbox(), (event) => {
+        // query returns the same entries as snapshot, just fewer of them.
+        if (event.kind === "tool" && (event.name === "snapshot" || event.name === "query") && !event.isError) {
+          const entries: Entry[] = JSON.parse(event.output)
+          if (Array.isArray(entries))
+            page = [...page.filter((e) => !entries.some((n) => n.ref === e.ref)), ...entries]
+        }
         setLines((prev) => [...prev, describe(event, page)])
       })
     } catch (error) {
@@ -128,11 +155,11 @@ function Chat({ nativeWebMCP }: { nativeWebMCP: boolean }) {
         </Button>
       </header>
       <p className="product">
-        Claude uses the tools this page registered through WebMCP
-        {nativeWebMCP ? ", passed on to the browser's own" : ""}.
+        Two separate choices: which tools Claude gets, and how its calls reach the page.
+        {nativeWebMCP ? "" : " This browser has no WebMCP, so the page stands in for it."}
       </p>
       <div className="tool-set">
-        <span id="tool-set-label">Claude's tools</span>
+        <span id="tool-set-label">1. Claude's tools</span>
         <SegmentedControl
           aria-labelledby="tool-set-label"
           value={toolSet}
@@ -146,6 +173,20 @@ function Chat({ nativeWebMCP }: { nativeWebMCP: boolean }) {
           ))}
         </SegmentedControl>
         <p>{toolSets.find((set) => set.value === toolSet)!.detail}</p>
+        <span id="route-label">2. How Claude reaches them</span>
+        <SegmentedControl
+          aria-labelledby="route-label"
+          value={route}
+          disabled={busy}
+          onValueChange={(value) => value && setRoute(value)}
+        >
+          {routes.map((r) => (
+            <SegmentedControlItem key={r.value} value={r.value}>
+              {r.label}
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
+        <p>{routes.find((r) => r.value === route)!.detail}</p>
       </div>
       <ol>
         {lines.map((line, i) => (

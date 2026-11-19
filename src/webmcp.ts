@@ -73,17 +73,29 @@ async function execute(name: string, input: object) {
   return tool.execute(input)
 }
 
-// How the in-page Claude calls them, as a browser agent would.
-const modelContextToolbox: Toolbox = {
+// Calls a registered tool's own execute, skipping the browser's WebMCP, so
+// DevTools never sees the call.
+async function executeDirect(name: string, input: object) {
+  const tool = registered.get(name)
+  if (!tool) throw new Error(`No WebMCP tool named ${name}`)
+  return tool.execute(input)
+}
+
+const toolboxFor = (run: (name: string, input: object) => Promise<unknown>): Toolbox => ({
   async run(name, input) {
     try {
-      const output: any = await execute(name, input)
+      const output: any = await run(name, input)
       const failed = output?.ok === false || (output && typeof output === "object" && "error" in output)
       return { output, isError: Boolean(failed) }
     } catch (error) {
       return { output: error instanceof Error ? error.message : String(error), isError: true }
     }
   },
-}
+})
 
-export { installModelContext, modelContextToolbox, modelContextTools, type ModelContextTool }
+// How the in-page Claude calls them, as a browser agent would.
+const modelContextToolbox = toolboxFor(execute)
+// The same tools as plain functions, without WebMCP.
+const directToolbox = toolboxFor(executeDirect)
+
+export { directToolbox, installModelContext, modelContextToolbox, modelContextTools, type ModelContextTool }

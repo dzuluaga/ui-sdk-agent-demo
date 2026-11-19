@@ -23,7 +23,7 @@ registerTaskTools()
 createRoot(document.getElementById("root")!).render(
   <>
     <Tasks />
-    <Chat nativeWebMCP={webmcp.native} />
+    <Chat agent={agent} nativeWebMCP={webmcp.native} />
     <Checkout />
   </>
 )

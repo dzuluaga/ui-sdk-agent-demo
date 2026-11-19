@@ -56,7 +56,14 @@ The page registers two tool sets through `document.modelContext.registerTool`. `
 - **ui-sdk, generated:** `registerTools(agent, { allow })`, one line. `snapshot`, `act` and `query` over every component on the page.
 - **Hand-written:** `src/webmcp-tools.ts`, 96 lines. `list_tasks`, `assign_task`, `set_status` and `delete_task`, written against the app's data, each checking its own arguments.
 
-Pick the set with the "Claude's tools" switch in Ask Claude. Results with `claude-opus-5-5` on 2026-11-18:
+Ask Claude has two switches, because these are separate questions:
+
+1. **Claude's tools:** where the tools come from. ui-sdk generates `snapshot`, `act` and `query` from the components; the hand-written ones are written for the task list.
+2. **How Claude reaches them:** **WebMCP** sends every call through the browser's `executeTool`, so DevTools shows it under Tool Activity. **Direct** calls `agent.act()` (ui-sdk) or the tool's own function (hand-written), with no WebMCP: the page changes the same way, and Tool Activity stays empty.
+
+ui-sdk doesn't need WebMCP. `registerTools(agent)` is one optional way to publish its bridge, and the Direct route never uses it.
+
+Results with `claude-opus-5-5` on 2026-11-18:
 
 | Request | ui-sdk | Hand-written | Both |
 | --- | --- | --- | --- |
